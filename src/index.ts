@@ -27,7 +27,7 @@ app.use("/lit", litRouter);
 
 app.locals.litNodeClient = new LitJsSdk.LitNodeClientNodeJs({
   alertWhenUnauthorized: false,
-  litNetwork: LitNetwork.DatilTest,
+  litNetwork: LitNetwork.DatilDev,
   connectTimeout: 100000,
 });
 await app.locals.litNodeClient.connect();

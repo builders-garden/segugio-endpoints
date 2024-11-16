@@ -8,6 +8,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
   Address,
   createWalletClient,
+  getAddress,
   http,
   PrivateKeyAccount,
   publicActions,
@@ -70,7 +71,7 @@ export async function createSegugio(
 
       const segugio = {
         owner: parsedBody.data.owner,
-        target: parsedBody.data.addressToFollow,
+        target: getAddress(parsedBody.data.addressToFollow),
         privateKey: newPrivateKey,
         address: account.address,
         ensDomain: parsedBody.data.segugioToolParams.ensDomain || null,
@@ -158,9 +159,11 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
     const reqBody = parsedBody.data!;
 
     // take here the segugios from db to get the targets of the transaction
-    logger.log(`looking for segugios for target ${reqBody.from}`);
-    const segugios = await getSegugiosByTarget(reqBody.from);
-    logger.log(`found ${segugios.length} segugios for target ${reqBody.from}`);
+    logger.log(`looking for segugios for target ${getAddress(reqBody.from)}`);
+    const segugios = await getSegugiosByTarget(getAddress(reqBody.from));
+    logger.log(
+      `found ${segugios.length} segugios for target ${getAddress(reqBody.from)}`
+    );
 
     const executedTransactions: {
       hash: string;
@@ -223,7 +226,7 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
 
       executedTransactions.push(...executed);
       failedTransactions.push(...failed);
-  
+
       await sendMessageToXmtpBot(
         segugio.xmtpGroupId,
         segugio.owner,
@@ -253,7 +256,8 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
 
 export async function swapTx(req: Request, res: Response): Promise<void> {
   try {
-    const { owner, target, amount, tokenOut, tokenIn } = req.body;
+    const { owner, target: tmpTarget, amount, tokenOut, tokenIn } = req.body;
+    const target = getAddress(tmpTarget);
     const segugio = await getSegugioByTargetAndOwner(target, owner);
     if (!segugio) {
       res.status(404).json({
@@ -296,7 +300,8 @@ export async function swapTx(req: Request, res: Response): Promise<void> {
 
 export async function withdraw(req: Request, res: Response): Promise<void> {
   try {
-    const { owner, target, amount, tokenToTransfer } = req.body;
+    const { owner, target: tmpTarget, amount, tokenToTransfer } = req.body;
+    const target = getAddress(tmpTarget);
     const segugio = await getSegugioByTargetAndOwner(target, owner);
     logger.log(
       `Correctly found segugio for target ${target} and owner ${owner}`

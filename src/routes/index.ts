@@ -1,10 +1,3 @@
-import type { Application } from "express";
-import oneInchRoutes from "./oneinch.route";
-import segugioRoutes from "./segugio.route";
-
-export default class Routes {
-  constructor(app: Application) {
-    app.use("/1inch", oneInchRoutes);
-    app.use("/segugio", segugioRoutes);
-  }
-}
+export * from "./utils/index.js";
+export * from "./1inch/index.js";
+export * from "./segugio/index.js";

@@ -241,7 +241,7 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
   }
 }
 
-export async function promptTx(req: Request, res: Response): Promise<void> {
+export async function swapTx(req: Request, res: Response): Promise<void> {
   try {
     const { owner, target, amount, tokenOut, tokenIn } = req.body;
     const segugio = await getSegugioByTargetAndOwner(target, owner);

@@ -37,26 +37,26 @@ export type Trade = {
 };
 
 export type QuickNodeNotification = {
-  id: string
-  created_at: string
-  updated_at: string
-  name: string
-  expression: string
-  network: string
+  id: string;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  expression: string;
+  network: string;
   destinations: Array<{
-    id: string
-    name: string
-    to: string
-    webhook_type: string
-    service: string
-    payload_type: number
-  }>
-  enabled: boolean
-}
+    id: string;
+    name: string;
+    to: string;
+    webhook_type: string;
+    service: string;
+    payload_type: number;
+  }>;
+  enabled: boolean;
+};
 
 export enum ProtocolEventType {
   Aggregator = "Aggregator",
-  Dex = "Dex"
+  Dex = "Dex",
 }
 
 export type ProtocolEvent = {
@@ -68,7 +68,7 @@ export type ProtocolEvent = {
   tokenOut: string | undefined;
   amountIn: string | string[] | undefined;
   amountOut: string | string[] | undefined;
-}
+};
 
 export type QuickNodeTrade = {
   from: string;
@@ -77,23 +77,23 @@ export type QuickNodeTrade = {
   tokenOut: string;
   amountIn: bigint;
   amountOut: bigint;
-}
+};
 
 export type DecodedEvent = {
-  encodedLog: Log<bigint, number, false>
+  encodedLog: Log<bigint, number, false>;
   eventName: undefined;
   args: readonly unknown[] | undefined;
-}
+};
 
 export type DecodedTransferEvent = {
-  encodedLog: Log<bigint, number, false>
+  encodedLog: Log<bigint, number, false>;
   eventName: "Transfer";
   args: {
     from: `0x${string}`;
     to: `0x${string}`;
     value: bigint;
-  }
-}
+  };
+};
 
 export type QuickNodeTx = {
   blockHash: string;
@@ -120,7 +120,7 @@ export type QuickNodeTx = {
   transactionHash: string;
   transactionIndex: string;
   type: string;
-}
+};
 
 export type OneInchTokenData = {
   [address: string]: {
@@ -134,5 +134,5 @@ export type OneInchTokenData = {
     eip2612: boolean;
     tags: string[];
     rating: number;
-  }
-}
+  };
+};

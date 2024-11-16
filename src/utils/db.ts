@@ -20,7 +20,7 @@ export const checkDuplicateSegugio = async (owner: string, target: string) => {
     where: and(eq(segugioTable.owner, owner), eq(segugioTable.target, target)),
   });
   return !!segugio;
-}
+};
 
 export const saveSegugio = async (segugioValues: Segugio) => {
   await db.insert(segugioTable).values({
@@ -62,6 +62,16 @@ export const getSegugiosByTarget = async (target: string) => {
 export const getSegugiosByOwner = async (owner: string) => {
   const segugio = await db.query.segugioTable.findMany({
     where: eq(segugioTable.owner, owner),
+  });
+  return segugio;
+};
+
+export const getSegugioByTargetAndOwner = async (
+  target: string,
+  owner: string
+) => {
+  const segugio = await db.query.segugioTable.findFirst({
+    where: and(eq(segugioTable.target, target), eq(segugioTable.owner, owner)),
   });
   return segugio;
 };

@@ -9,6 +9,7 @@ import {
   Address,
   createWalletClient,
   http,
+  PrivateKeyAccount,
   publicActions,
   SendTransactionErrorType,
 } from "viem";
@@ -17,12 +18,14 @@ import { brianTransact } from "../../utils/brian.js";
 import { Token } from "@brian-ai/sdk";
 import {
   checkDuplicateSegugio,
+  getSegugioByTargetAndOwner,
   getSegugiosByTarget,
   saveSegugio,
 } from "../../utils/db.js";
 import axios from "axios";
 import { env } from "../../env.js";
 import { OneInchTokenData } from "../../utils/types.js";
+import { Segugio } from "../../utils/types.js";
 
 const logger = new Logger("segugio");
 
@@ -212,62 +215,12 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
           ? privateKey
           : `0x${privateKey}`) as Address
       );
-      const walletClient = createWalletClient({
-        account,
-        chain: base,
-        transport: http(),
-      }).extend(publicActions);
 
-      const brianResponse = await brianTransact(prompt, account.address);
+      const { executedTransactions: executed, failedTransactions: failed } =
+        await executeBrianTransactionsForSegugio(account, prompt, segugio);
 
-      for (var transactionResult of brianResponse) {
-        logger.log(
-          `reading transaction result with solver ${transactionResult.solver} and action ${transactionResult.action}`
-        );
-        if (transactionResult.action !== "swap") {
-          logger.error(
-            `action ${transactionResult.action} is not supported. Skipping...`
-          );
-          continue;
-        }
-        if (
-          transactionResult.data.steps &&
-          transactionResult.data.steps?.length >= 0
-        ) {
-          for (var step of transactionResult.data.steps) {
-            try {
-              const result = await walletClient.sendTransaction({
-                from: step.from,
-                to: step.to,
-                data: step.data,
-                value: BigInt(step.value),
-              });
-              logger.log(`Transaction result hash: ${result}`);
-              executedTransactions.push({
-                hash: result,
-                action: transactionResult.action,
-                fromToken: transactionResult.data.fromToken,
-                toToken: transactionResult.data.toToken,
-                receiver: (transactionResult.data as any).receiver,
-                prompt: prompt,
-              });
-            } catch (error) {
-              const e = error as SendTransactionErrorType;
-              logger.error(
-                `error executing tx for segugio ${
-                  segugio.id
-                }: ${e.message.slice(0, e.message.indexOf("\n"))}`
-              );
-              failedTransactions.push({
-                segugioId: segugio.id,
-                target: segugio.target,
-                owner: segugio.owner,
-                error: e,
-              });
-            }
-          }
-        }
-      }
+      executedTransactions.push(...executed);
+      failedTransactions.push(...failed);
     }
 
     res.status(200).json({
@@ -286,4 +239,174 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
       },
     });
   }
+}
+
+export async function promptTx(req: Request, res: Response): Promise<void> {
+  try {
+    const { owner, target, amount, tokenOut, tokenIn } = req.body;
+    const segugio = await getSegugioByTargetAndOwner(target, owner);
+    if (!segugio) {
+      res.status(404).json({
+        status: "nok",
+        data: {
+          message: `Segugio not found for target ${target} and owner ${owner}`,
+        },
+      });
+      return;
+    }
+
+    const prompt = `Swap ${amount}$ of ${tokenIn} for ${tokenOut} on Base mainnet`;
+    const privateKey = segugio.privateKey;
+    const account = privateKeyToAccount(
+      (privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`) as Address
+    );
+
+    const { executedTransactions, failedTransactions } =
+      await executeBrianTransactionsForSegugio(account, prompt, segugio);
+
+    res.status(200).json({
+      status: "ok",
+      data: {
+        executedTransactions,
+        failedTransactions,
+      },
+    });
+  } catch (error) {
+    logger.error(`Error selling token: ${error}`);
+    res.status(500).json({
+      status: "nok",
+      data: {
+        message: `Error selling token: ${error}`,
+      },
+    });
+  }
+}
+
+export async function withdraw(req: Request, res: Response): Promise<void> {
+  try {
+    const { owner, target, amount, tokenToTransfer } = req.body;
+    const segugio = await getSegugioByTargetAndOwner(target, owner);
+    logger.log(
+      `Correctly found segugio for target ${target} and owner ${owner}`
+    );
+    if (!segugio) {
+      res.status(404).json({
+        status: "nok",
+        data: {
+          message: `Segugio not found for target ${target} and owner ${owner}`,
+        },
+      });
+      return;
+    }
+
+    const prompt = `Transfer ${amount}$ of ${tokenToTransfer} to ${segugio.owner} on Base mainnet`;
+    const privateKey = segugio.privateKey;
+    const account = privateKeyToAccount(
+      (privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`) as Address
+    );
+
+    const { executedTransactions, failedTransactions } =
+      await executeBrianTransactionsForSegugio(account, prompt, segugio, true);
+    logger.log(
+      `Brian transactions were processed. Executed count: ${executedTransactions.length}, Failed count: ${failedTransactions.length}`
+    );
+
+    res.status(200).json({
+      status: "ok",
+      data: {
+        executedTransactions,
+        failedTransactions,
+      },
+    });
+  } catch (error) {
+    logger.error(`Error selling token: ${error}`);
+    res.status(500).json({
+      status: "nok",
+      data: {
+        message: `Error selling token: ${error}`,
+      },
+    });
+  }
+}
+
+async function executeBrianTransactionsForSegugio(
+  account: PrivateKeyAccount,
+  prompt: string,
+  segugio: Segugio & { id: number },
+  withdraw = false
+) {
+  const walletClient = createWalletClient({
+    account,
+    chain: base,
+    transport: http(),
+  }).extend(publicActions);
+
+  const brianResponse = await brianTransact(prompt, account.address);
+  console.log(JSON.stringify(brianResponse, null, 2));
+
+  const executedTransactions: {
+    hash: string;
+    action: string;
+    fromToken: Token | undefined;
+    toToken: Token | undefined;
+    receiver: string;
+    prompt: string;
+  }[] = [];
+  const failedTransactions: {
+    segugioId: number;
+    target: string;
+    owner: string;
+    error: SendTransactionErrorType;
+  }[] = [];
+  for (var transactionResult of brianResponse) {
+    logger.log(
+      `reading transaction result with solver ${transactionResult.solver} and action ${transactionResult.action}`
+    );
+    if (transactionResult.action !== "swap" && withdraw == false) {
+      logger.error(
+        `action ${transactionResult.action} is not supported. Skipping...`
+      );
+      continue;
+    }
+    if (
+      transactionResult.data.steps &&
+      transactionResult.data.steps?.length >= 0
+    ) {
+      for (var step of transactionResult.data.steps) {
+        try {
+          const result = await walletClient.sendTransaction({
+            from: step.from,
+            to: step.to,
+            data: step.data,
+            value: BigInt(step.value),
+          });
+          logger.log(`Transaction result hash: ${result}`);
+          executedTransactions.push({
+            hash: result,
+            action: transactionResult.action,
+            fromToken: transactionResult.data.fromToken,
+            toToken: transactionResult.data.toToken,
+            receiver: (transactionResult.data as any).receiver,
+            prompt: prompt,
+          });
+        } catch (error) {
+          const e = error as SendTransactionErrorType;
+          logger.error(
+            `error executing tx for segugio ${segugio.id}: ${e.message.slice(
+              0,
+              e.message.indexOf("\n")
+            )}`
+          );
+          failedTransactions.push({
+            segugioId: segugio.id,
+            target: segugio.target,
+            owner: segugio.owner,
+            error: e,
+          });
+        }
+      }
+    }
+  }
+
+  return { executedTransactions, failedTransactions };
 }

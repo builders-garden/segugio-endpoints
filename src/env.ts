@@ -9,6 +9,9 @@ const envSchema = z.object({
     .trim()
     .default("8080")
     .transform((v) => parseInt(v)),
+  // turso
+  TURSO_DATABASE_URL: z.string().url().trim().min(1),
+  TURSO_AUTH_TOKEN: z.string().trim().min(1),
 });
 
 const { data, success, error } = envSchema.safeParse(process.env);

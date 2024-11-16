@@ -9,6 +9,8 @@ const envSchema = z.object({
     .trim()
     .default("8080")
     .transform((v) => parseInt(v)),
+  QUICKNODE_API_KEY: z.string().trim().min(1),
+  QUICKNODE_NOTIFICATION_ID: z.string().trim().min(1),
 });
 
 const { data, success, error } = envSchema.safeParse(process.env);

@@ -1,7 +1,7 @@
 import { env } from "./env.js";
 import express, { type Application } from "express";
 import cors, { type CorsOptions } from "cors";
-import { oneInchRouter, segugioRouter, utilsRouter } from "./routes/index.js";
+import { oneInchRouter, segugioRouter, utilsRouter, quickNodeRouter } from "./routes/index.js";
 
 const corsOptions: CorsOptions = {
   origin: "http://localhost:8081",
@@ -16,6 +16,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/", utilsRouter);
 app.use("/1inch", oneInchRouter);
 app.use("/segugio", segugioRouter);
+app.use("/quicknode", quickNodeRouter);
 
 app
   .listen(env.PORT, async () => {

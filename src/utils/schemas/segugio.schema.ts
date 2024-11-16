@@ -75,12 +75,12 @@ export const fireTxSchema = z.object({
     })
     .describe("The token to receive - address"),
   amountIn: z
-    .bigint({
+    .string({
       required_error: "Amount in is required",
     })
     .describe("The amount of token to swap - bigint"),
   amountOut: z
-    .bigint({
+    .string({
       required_error: "Amount out is required",
     })
     .describe("The amount of token to receive - bigint"),

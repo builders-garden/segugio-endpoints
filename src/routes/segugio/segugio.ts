@@ -227,12 +227,18 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
       executedTransactions.push(...executed);
       failedTransactions.push(...failed);
 
+      logger.log(
+        `Brian transactions were processed. Executed count: ${executedTransactions.length}, Failed count: ${failedTransactions.length}`
+      );
       await sendMessageToXmtpBot(
         segugio.xmtpGroupId,
         segugio.owner,
         segugio.address,
         `Transaction executed: ${prompt}`,
         executedTransactions[0].hash
+      );
+      logger.log(
+        `Message sent to XMTP bot for segugio ${segugio.address} and owner ${segugio.owner}`
       );
     }
 
@@ -441,6 +447,10 @@ async function sendMessageToXmtpBot(
 
   const result = await axios(`${env.XMTP_BOT_URL}/send-message`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": "1234567890",
+    },
     data: {
       groupId,
       userAddress,

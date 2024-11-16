@@ -1,5 +1,8 @@
 import type { Request, Response } from "express";
-import { createSegugioSchema, fireTxSchema } from "../../utils/schemas/segugio.schema.js";
+import {
+  createSegugioSchema,
+  fireTxSchema,
+} from "../../utils/schemas/segugio.schema.js";
 import { Logger } from "../../utils/logger.js";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
@@ -12,7 +15,11 @@ import {
 import { base } from "viem/chains";
 import { brianTransact } from "../../utils/brian.js";
 import { Token } from "@brian-ai/sdk";
-import { checkDuplicateSegugio, getSegugiosByTarget, saveSegugio } from "../../utils/db.js";
+import {
+  checkDuplicateSegugio,
+  getSegugiosByTarget,
+  saveSegugio,
+} from "../../utils/db.js";
 import axios from "axios";
 import { env } from "../../env.js";
 
@@ -25,21 +32,26 @@ export async function createSegugio(
   try {
     logger.log("Creating segugio...");
     const parsedBody = createSegugioSchema.safeParse(req.body);
-  
+
     if (!parsedBody.success) {
       logger.error(`Error ${JSON.stringify(parsedBody.error.errors)}`);
       res.status(400).json({ error: parsedBody.error.errors });
     } else {
-
-      const isDuplicated = await checkDuplicateSegugio(parsedBody.data.owner, parsedBody.data.addressToFollow);
+      const isDuplicated = await checkDuplicateSegugio(
+        parsedBody.data.owner,
+        parsedBody.data.addressToFollow
+      );
 
       if (isDuplicated) {
-        logger.error(`Segugio already exists for ${parsedBody.data.addressToFollow}`);
+        logger.error(
+          `Segugio already exists for ${parsedBody.data.addressToFollow}`
+        );
         res.status(200).json({
           status: "ok",
           data: {
             message: `Segugio already exists for ${
-              parsedBody.data.segugioToolParams.ensDomain ?? parsedBody.data.addressToFollow
+              parsedBody.data.segugioToolParams.ensDomain ??
+              parsedBody.data.addressToFollow
             }`,
           },
         });
@@ -49,7 +61,7 @@ export async function createSegugio(
       // create new Segugio wallet
       const newPrivateKey = generatePrivateKey();
       const account = privateKeyToAccount(newPrivateKey);
-  
+
       const segugio = {
         owner: parsedBody.data.owner,
         target: parsedBody.data.addressToFollow,
@@ -64,7 +76,7 @@ export async function createSegugio(
         defaultTokenIn: parsedBody.data.defaultTokenIn ?? "ETH",
         xmtpGroupId: parsedBody.data.xmtpGroupId,
       };
-  
+
       const result = await axios(
         `${env.APP_BASE_URL}/quicknode/add-address-to-scan`,
         {
@@ -74,7 +86,7 @@ export async function createSegugio(
           },
         }
       );
-  
+
       if (result.status !== 200) {
         logger.error(
           `Error adding address ${segugio.target} to QuickNode: ${result.data}`
@@ -84,17 +96,17 @@ export async function createSegugio(
         });
         return;
       }
-  
+
       logger.log(
         `Address ${segugio.target} added to QuickNode with status ${result.status}`
       );
-  
+
       await saveSegugio(segugio);
-  
+
       logger.log(
         `New Segugio created and stored for ${parsedBody.data.addressToFollow} with address ${segugio.address}`
       );
-  
+
       res.status(200).json({
         status: "ok",
         data: {
@@ -122,42 +134,28 @@ export async function createSegugio(
       status: "nok",
       data: {
         message: `Error creating segugio: ${err}`,
-      }
+      },
     });
   }
 }
 
 // This function will be used by the Caso's webhook when he finds a new transaction from the address we are following
-// or will be called by the Converse app to perform transaction
-/*
-  {
-    "prompt": "Swap 1 ETH to DAI on Base mainnet",
-    "originWallet": "0x1234567890",
-  } || {
-    "from": "0x1234567890",
-    "protocol": "Uniswap",
-    "tokenIn": "ETH" | "0x32434354354354",
-    "tokenOut": "DAI",
-    "amountIn": "1",
-    "amountOut": "100",
-  }
-*/
 export async function fireTx(req: Request, res: Response): Promise<void> {
   try {
     const parsedBody = fireTxSchema.safeParse(req.body);
-  
+
     if (!parsedBody.success) {
       logger.error(`Error ${JSON.stringify(parsedBody.error.errors)}`);
       res.status(400).json({ error: parsedBody.error.errors });
     }
-  
+
     const reqBody = parsedBody.data!;
-  
+
     // take here the segugios from db to get the targets of the transaction
     logger.log(`looking for segugios for target ${reqBody.from}`);
     const segugios = await getSegugiosByTarget(reqBody.from);
     logger.log(`found ${segugios.length} segugios for target ${reqBody.from}`);
-  
+
     const executedTransactions: {
       hash: string;
       action: string;
@@ -186,19 +184,20 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
         `executing transaction for segugio ${segugio.address} from user ${segugio.owner}`
       );
       const privateKey = segugio.privateKey;
-  
+
       const account = privateKeyToAccount(
-        (privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`) as Address
+        (privateKey.startsWith("0x")
+          ? privateKey
+          : `0x${privateKey}`) as Address
       );
       const walletClient = createWalletClient({
         account,
         chain: base,
         transport: http(),
       }).extend(publicActions);
-  
+
       const brianResponse = await brianTransact(prompt, account.address);
-      // console.log(JSON.stringify(brianResponse, null, 2));
-  
+
       for (var transactionResult of brianResponse) {
         logger.log(
           `reading transaction result with solver ${transactionResult.solver} and action ${transactionResult.action}`
@@ -233,10 +232,9 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
             } catch (error) {
               const e = error as SendTransactionErrorType;
               logger.error(
-                `error executing tx for segugio ${segugio.id}: ${e.message.slice(
-                  0,
-                  e.message.indexOf("\n")
-                )}`
+                `error executing tx for segugio ${
+                  segugio.id
+                }: ${e.message.slice(0, e.message.indexOf("\n"))}`
               );
               failedTransactions.push({
                 segugioId: segugio.id,
@@ -249,7 +247,7 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
         }
       }
     }
-  
+
     res.status(200).json({
       status: "ok",
       data: {
@@ -263,7 +261,7 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
       status: "nok",
       data: {
         message: `Error firing transaction: ${err}`,
-      }
+      },
     });
   }
 }

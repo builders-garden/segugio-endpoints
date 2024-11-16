@@ -121,3 +121,18 @@ export type QuickNodeTx = {
   transactionIndex: string;
   type: string;
 }
+
+export type OneInchTokenData = {
+  [address: string]: {
+    address: string;
+    chainId: number;
+    decimals: number;
+    name: string;
+    symbol: string;
+    providers: string[];
+    logoURI: string;
+    eip2612: boolean;
+    tags: string[];
+    rating: number;
+  }
+}

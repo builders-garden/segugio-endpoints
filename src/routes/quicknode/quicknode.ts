@@ -5,6 +5,7 @@ import { DecodedEvent, DecodedTransferEvent, ProtocolEventType, QuickNodeNotific
 import { env } from "../../env.js";
 import { decodeEventLog, Log, parseAbi } from "viem";
 import { events, TransferAbi } from "../../utils/constants.js";
+import axios from "axios";
 
 const logger = new Logger("quicknode");
 
@@ -115,7 +116,7 @@ export async function notifyTx(req: Request, res: Response) {
     let tradeAmountIn: bigint = 0n;
     let tradeAmountOut: bigint = 0n;
   
-    parsed.data!.forEach((tx) => {
+    parsed.data!.forEach(async (tx) => {
       let swapEvents: DecodedEvent[] = []
       let transferEvents: DecodedTransferEvent[] = []
       mainLoop:
@@ -285,9 +286,34 @@ export async function notifyTx(req: Request, res: Response) {
         }
       }
   
-      logger.log(`New Trade:${
+      logger.log(`New Trade:\n${
         JSON.stringify(trade, (_, value) => typeof value === 'bigint' ? value.toString() : value, 2)
       }`);
+
+      const result = await axios(
+        `${env.APP_BASE_URL}/segugio/tx`,
+        {
+          method: "POST",
+          data: {
+            from: trade.from,
+            protocol: trade.protocol,
+            tokenIn: trade.tokenIn,
+            tokenOut: trade.tokenOut,
+            amountIn: trade.amountIn.toString(),
+            amountOut: trade.amountOut.toString(),
+          },
+        }
+      );
+
+      if (result.status !== 200) {
+        logger.error(
+          `Error processing trade ${trade}: ${result.data}`
+        );
+        res.status(500).json({
+          error: `Error processing trade ${trade}: ${result.data}`,
+        });
+        return;
+      }
     });
   
     res.send("ok");

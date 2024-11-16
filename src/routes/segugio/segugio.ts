@@ -22,6 +22,7 @@ import {
 } from "../../utils/db.js";
 import axios from "axios";
 import { env } from "../../env.js";
+import { OneInchTokenData } from "../../utils/types.js";
 
 const logger = new Logger("segugio");
 
@@ -170,6 +171,27 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
       owner: string;
       error: SendTransactionErrorType;
     }[] = [];
+
+    const result = await axios(
+      `${env.APP_BASE_URL}/1inch/tokens-data?addresses=${reqBody.tokenOut}`,
+      {
+        method: "GET",
+      }
+    );
+
+    if (result.status !== 200) {
+      logger.error(
+        `Error getting tokens data for ${reqBody.tokenOut}: ${result.data}`
+      );
+      res.status(500).json({
+        error: `Error getting tokens data for ${reqBody.tokenOut}: ${result.data}`,
+      });
+      return;
+    }
+
+    const tokensData = result.data.data.tokensData as OneInchTokenData;
+    const tokenOutData = tokensData[reqBody.tokenOut];
+
     for (var segugio of segugios) {
       let prompt;
       if (!reqBody.tokenOut || !reqBody.amountOut) {
@@ -178,7 +200,7 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
         });
         return;
       }
-      prompt = `Swap ${segugio.defaultAmountIn}$ ${segugio.defaultTokenIn} to ${reqBody.tokenOut} on Base mainnet`;
+      prompt = `Swap ${segugio.defaultAmountIn}$ ${segugio.defaultTokenIn} to ${tokenOutData.symbol} (${tokenOutData.name}) on Base mainnet`;
       logger.log(`Using prompt: ${prompt}`);
       logger.log(
         `executing transaction for segugio ${segugio.address} from user ${segugio.owner}`

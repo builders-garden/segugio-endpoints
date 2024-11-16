@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { env } from "../../env.js";
 import axios from "axios";
+import { OneInchTokenData } from "../../utils/types.js";
 
 const ONEINCH_BASE_URL = "https://api.1inch.dev";
 const chainId = "8453";
@@ -171,7 +172,7 @@ export async function getTokensData(req: Request, res: Response) {
     res.status(200).json({
       status: "ok",
       data: {
-        tokensData: response.data,
+        tokensData: response.data as OneInchTokenData,
       },
     });
   } catch (error) {

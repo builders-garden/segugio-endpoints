@@ -3,7 +3,7 @@ import { addAddressToScan, notifyTx } from "./quicknode.js";
 
 const quickNodeRouter = express.Router();
 
-quickNodeRouter.post("/addAddressToScan", addAddressToScan);
-quickNodeRouter.post("/notifyTx", notifyTx);
+quickNodeRouter.post("/add-address-to-scan", addAddressToScan);
+quickNodeRouter.post("/notify-tx", notifyTx);
 
 export { quickNodeRouter };

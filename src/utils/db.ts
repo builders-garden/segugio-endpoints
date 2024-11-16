@@ -1,7 +1,7 @@
 import { env } from "../env.js";
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { segugioTable, tradeTable } from "./schemas/db.schema.js";
 import { Segugio } from "./types.js";
@@ -15,6 +15,13 @@ export const db = drizzle(tursoClient, {
   schema: { segugioTable, tradeTable },
 });
 
+export const checkDuplicateSegugio = async (owner: string, target: string) => {
+  const segugio = await db.query.segugioTable.findFirst({
+    where: and(eq(segugioTable.owner, owner), eq(segugioTable.target, target)),
+  });
+  return !!segugio;
+}
+
 export const saveSegugio = async (segugioValues: Segugio) => {
   await db.insert(segugioTable).values({
     owner: segugioValues.owner,
@@ -25,8 +32,9 @@ export const saveSegugio = async (segugioValues: Segugio) => {
     resolvedEnsDomain: segugioValues.resolvedEnsDomain,
     timeRange: segugioValues.timeRange,
     onlyBuyTrades: segugioValues.onlyBuyTrades,
-    portfolioPercentage: segugioValues.portfolioPercentage,
-    tokenFrom: segugioValues.tokenFrom,
+    defaultAmountIn: segugioValues.defaultAmountIn,
+    defaultTokenIn: segugioValues.defaultTokenIn,
+    xmtpGroupId: segugioValues.xmtpGroupId,
   });
 };
 

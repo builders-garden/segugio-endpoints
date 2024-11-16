@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { text, sqliteTable, integer, real } from "drizzle-orm/sqlite-core";
+import { text, sqliteTable, integer, real,  } from "drizzle-orm/sqlite-core";
 
 export const segugioTable = sqliteTable("segugio", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -15,29 +15,12 @@ export const segugioTable = sqliteTable("segugio", {
     .$type<boolean>()
     .notNull()
     .default(true),
-  portfolioPercentage: real("portfolio_percentage").notNull(),
-  tokenFrom: text("token_from").notNull(),
+  defaultAmountIn: real("default_amount_in").notNull(),
+  defaultTokenIn: text("default_token_in").notNull(),
+  xmtpGroupId: text("xmtp_group_id").notNull(),
   createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
-
-// TODO: remove this if not needed
-// export const targetTable = sqliteTable("target", {
-//   id: integer("id").primaryKey({ autoIncrement: true }),
-//   segugioId: integer("segugio_id").references(() => segugioTable.id),
-//   ensDomain: text("ens_domain"),
-//   address: text("address"),
-//   resolvedEnsDomain: text("resolved_ens_domain"),
-//   timeRange: text("time_range").notNull(),
-//   onlyBuyTrades: integer("only_buy_trades")
-//     .$type<boolean>()
-//     .notNull()
-//     .default(true),
-//   portfolioPercentage: real("portfolio_percentage").notNull(),
-//   tokenFrom: text("token_from").notNull(),
-//   createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
-//   updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
-// });
 
 export const tradeTable = sqliteTable("trade", {
   id: integer("id").primaryKey({ autoIncrement: true }),

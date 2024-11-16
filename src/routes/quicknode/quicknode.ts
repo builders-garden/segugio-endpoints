@@ -6,7 +6,7 @@ import { env } from "../../env.js";
 import { decodeEventLog, Log, parseAbi } from "viem";
 import { events, TransferAbi } from "../../utils/constants.js";
 
-const logger = new Logger("testHandler");
+const logger = new Logger("quicknode");
 
 const QUICKNODE_API_KEY = env.QUICKNODE_API_KEY
 const QUICKNODE_NOTIFICATION_ID = env.QUICKNODE_NOTIFICATION_ID
@@ -43,12 +43,21 @@ export async function addAddressToScan(req: Request, res: Response) {
     logger.error(`Error ${JSON.stringify(parsedBody.error.errors)}`);
     res.status(400).json({ error: parsedBody.error.errors });
   } else {
-    logger.log(`Successfully parsed body ${JSON.stringify(parsedBody.data)}`);
-
     let notification = await getNotification()
 
     if (!notification) {
       res.status(500).json({ error: 'Error getting notification' })
+      return
+    }
+
+    if (notification.expression.includes(parsedBody.data.address)) {
+      res.status(200).json({
+        status: "ok",
+        data: {
+          address: parsedBody.data.address,
+          message: `Address already exists in QuickNode for ${parsedBody.data.address}`,
+        }
+      });
       return
     }
 
@@ -80,8 +89,11 @@ export async function addAddressToScan(req: Request, res: Response) {
     }
 
     res.status(200).json({
-      address: parsedBody.data.address,
-      message: `Successfully addedd address to QuickNode for ${parsedBody.data.address}`,
+      status: "ok",
+      data: {
+        address: parsedBody.data.address,
+        message: `Successfully added address to QuickNode for ${parsedBody.data.address}`,
+      }
     });
   }
 }

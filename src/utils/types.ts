@@ -9,8 +9,9 @@ export type Segugio = {
   resolvedEnsDomain: string | null;
   timeRange: string;
   onlyBuyTrades: boolean;
-  portfolioPercentage: number;
-  tokenFrom: string;
+  defaultAmountIn: number;
+  defaultTokenIn: string;
+  xmtpGroupId: string;
   trades?: Trade[]; // trades that the segugio has made
 };
 

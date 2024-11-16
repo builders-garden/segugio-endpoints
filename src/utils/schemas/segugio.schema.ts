@@ -34,18 +34,23 @@ export const createSegugioSchema = z.object({
     .nullish()
     .describe("Whether to only copy buy trades and ignore all sell trades")
     .default(true),
-  portfolioPercentage: z
+  defaultAmountIn: z
     .number()
     .nullish()
     .describe(
-      "The maximum percentage of the portfolio to allocate to each trade"
+      "The default amount of token to be used for the swap - in USD"
     )
-    .default(0.1),
-  tokenFrom: z
+    .default(1),
+  defaultTokenIn: z
     .string()
     .nullish()
     .describe("The default token to be used for the swap")
-    .default("USDC"),
+    .default("ETH"),
+  xmtpGroupId: z
+    .string({
+      required_error: "XMTP group id is required",
+    })
+    .describe("The group id for the XMTP"),
 });
 
 export const fireTxSchema = z.object({

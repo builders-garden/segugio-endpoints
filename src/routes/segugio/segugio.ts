@@ -12,62 +12,117 @@ import {
 import { base } from "viem/chains";
 import { brianTransact } from "../../utils/brian.js";
 import { Token } from "@brian-ai/sdk";
-import { getSegugiosByTarget, saveSegugio } from "../../utils/db.js";
+import { checkDuplicateSegugio, getSegugiosByTarget, saveSegugio } from "../../utils/db.js";
+import axios from "axios";
+import { env } from "../../env.js";
 
-const logger = new Logger("segugio-controller");
+const logger = new Logger("segugio");
+
 export async function createSegugio(
   req: Request,
   res: Response
 ): Promise<void> {
-  logger.log("Creating segugio...");
-  const parsedBody = createSegugioSchema.safeParse(req.body);
+  try {
+    logger.log("Creating segugio...");
+    const parsedBody = createSegugioSchema.safeParse(req.body);
+  
+    if (!parsedBody.success) {
+      logger.error(`Error ${JSON.stringify(parsedBody.error.errors)}`);
+      res.status(400).json({ error: parsedBody.error.errors });
+    } else {
 
-  if (!parsedBody.success) {
-    logger.error(`Error ${JSON.stringify(parsedBody.error.errors)}`);
-    res.status(400).json({ error: parsedBody.error.errors });
-  } else {
-    // create new Segugio wallet
-    const newPrivateKey = generatePrivateKey();
-    const account = privateKeyToAccount(newPrivateKey);
+      const isDuplicated = await checkDuplicateSegugio(parsedBody.data.owner, parsedBody.data.addressToFollow);
 
-    const segugio = {
-      owner: parsedBody.data.owner,
-      target: parsedBody.data.addressToFollow,
-      privateKey: newPrivateKey,
-      address: account.address,
-      ensDomain: parsedBody.data.segugioToolParams.ensDomain || null,
-      resolvedEnsDomain:
-        parsedBody.data.segugioToolParams.resolvedEnsDomain || null,
-      timeRange: parsedBody.data.timeRange,
-      onlyBuyTrades: parsedBody.data.onlyBuyTrades ?? true,
-      portfolioPercentage: parsedBody.data.portfolioPercentage ?? 0.1,
-      tokenFrom: parsedBody.data.tokenFrom ?? "USDC",
-    };
-    // console.log("the new segugio will be: ", segugio);
-    // store the Segugio in the database
-    await saveSegugio(segugio);
-    logger.log(
-      `New Segugio created and stored for ${parsedBody.data.addressToFollow} with address ${segugio.address}`
-    );
+      if (isDuplicated) {
+        logger.error(`Segugio already exists for ${parsedBody.data.addressToFollow}`);
+        res.status(200).json({
+          status: "ok",
+          data: {
+            message: `Segugio already exists for ${
+              parsedBody.data.segugioToolParams.ensDomain ?? parsedBody.data.addressToFollow
+            }`,
+          },
+        });
+        return;
+      }
 
-    // TODO: add here a ping to the webhook of the Caso to notify the new segugio
-
-    res.status(200).json({
-      status: "ok",
-      data: {
-        message: `Successfully created segugio for ${parsedBody.data.addressToFollow} with address ${segugio.address}`,
-        segugio: {
-          owner: segugio.owner,
-          address: segugio.address,
-          target: segugio.target,
-          ensDomain: segugio.ensDomain,
-          resolvedEnsDomain: segugio.resolvedEnsDomain,
-          timeRange: segugio.timeRange,
-          onlyBuyTrades: segugio.onlyBuyTrades,
-          portfolioPercentage: segugio.portfolioPercentage,
-          tokenFrom: segugio.tokenFrom,
+      // create new Segugio wallet
+      const newPrivateKey = generatePrivateKey();
+      const account = privateKeyToAccount(newPrivateKey);
+  
+      const segugio = {
+        owner: parsedBody.data.owner,
+        target: parsedBody.data.addressToFollow,
+        privateKey: newPrivateKey,
+        address: account.address,
+        ensDomain: parsedBody.data.segugioToolParams.ensDomain || null,
+        resolvedEnsDomain:
+          parsedBody.data.segugioToolParams.resolvedEnsDomain || null,
+        timeRange: parsedBody.data.timeRange,
+        onlyBuyTrades: parsedBody.data.onlyBuyTrades ?? true,
+        defaultAmountIn: parsedBody.data.defaultAmountIn ?? 1,
+        defaultTokenIn: parsedBody.data.defaultTokenIn ?? "ETH",
+        xmtpGroupId: parsedBody.data.xmtpGroupId,
+      };
+  
+      const result = await axios(
+        `${env.APP_BASE_URL}/quicknode/add-address-to-scan`,
+        {
+          method: "POST",
+          data: {
+            address: segugio.target,
+          },
+        }
+      );
+  
+      if (result.status !== 200) {
+        logger.error(
+          `Error adding address ${segugio.target} to QuickNode: ${result.data}`
+        );
+        res.status(500).json({
+          error: `Error adding address ${segugio.target} to QuickNode: ${result.data}`,
+        });
+        return;
+      }
+  
+      logger.log(
+        `Address ${segugio.target} added to QuickNode with status ${result.status}`
+      );
+  
+      await saveSegugio(segugio);
+  
+      logger.log(
+        `New Segugio created and stored for ${parsedBody.data.addressToFollow} with address ${segugio.address}`
+      );
+  
+      res.status(200).json({
+        status: "ok",
+        data: {
+          message: `Segugio created successfully for ${
+            segugio.ensDomain ?? segugio.target
+          } with address ${segugio.address}`,
+          segugio: {
+            owner: segugio.owner,
+            address: segugio.address,
+            target: segugio.target,
+            ensDomain: segugio.ensDomain,
+            resolvedEnsDomain: segugio.resolvedEnsDomain,
+            timeRange: segugio.timeRange,
+            onlyBuyTrades: segugio.onlyBuyTrades,
+            defaultAmountIn: segugio.defaultAmountIn,
+            defaultTokenIn: segugio.defaultTokenIn,
+            xmtpGroupId: segugio.xmtpGroupId,
+          },
         },
-      },
+      });
+    }
+  } catch (err) {
+    logger.error(`Error creating segugio: ${err}`);
+    res.status(500).json({
+      status: "nok",
+      data: {
+        message: `Error creating segugio: ${err}`,
+      }
     });
   }
 }
@@ -125,7 +180,7 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
       });
       return;
     }
-    prompt = `Swap ${reqBody.amountOut}$ ${segugio.tokenFrom} to ${reqBody.tokenOut} on Base mainnet`;
+    prompt = `Swap ${reqBody.amountOut}$ ${segugio.defaultTokenIn} to ${reqBody.tokenOut} on Base mainnet`;
     // }
     logger.log(`Using prompt: ${prompt}`);
     logger.log(

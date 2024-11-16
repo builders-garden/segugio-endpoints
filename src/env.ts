@@ -9,6 +9,8 @@ const envSchema = z.object({
     .trim()
     .default("8080")
     .transform((v) => parseInt(v)),
+  BRIAN_API_KEY: z.string().min(1),
+  PRIVATE_KEY: z.string().min(1),
 });
 
 const { data, success, error } = envSchema.safeParse(process.env);

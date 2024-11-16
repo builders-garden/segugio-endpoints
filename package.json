@@ -21,9 +21,11 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@brian-ai/sdk": "^0.3.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
+    "viem": "^2.21.45",
     "zod": "^3.23.8"
   }
 }

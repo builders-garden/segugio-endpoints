@@ -11,6 +11,9 @@ const envSchema = z.object({
     .transform((v) => parseInt(v)),
   BRIAN_API_KEY: z.string().min(1),
   PRIVATE_KEY: z.string().min(1),
+  // turso
+  TURSO_DATABASE_URL: z.string().url().trim().min(1),
+  TURSO_AUTH_TOKEN: z.string().trim().min(1),
 });
 
 const { data, success, error } = envSchema.safeParse(process.env);

@@ -29,5 +29,17 @@ export const createSegugioSchema = z.object({
     .boolean()
     .nullish()
     .describe("Whether to only copy buy trades and ignore all sell trades")
-    .default(false),
+    .default(true),
+  portfolioPercentage: z
+    .number()
+    .nullish()
+    .describe(
+      "The maximum percentage of the portfolio to allocate to each trade"
+    )
+    .default(0.1),
+  tokenFrom: z
+    .string()
+    .nullish()
+    .describe("The default token to be used for the swap")
+    .default("USDC"),
 });

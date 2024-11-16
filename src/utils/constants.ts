@@ -1,4 +1,4 @@
-import { ProtocolEventType, type ProtocolEvent } from "./types";
+import { ProtocolEvent, ProtocolEventType } from "./types.js";
 
 export const TransferAbi = "event Transfer(address indexed from, address indexed to, uint256 value)";
 

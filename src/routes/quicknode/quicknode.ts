@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
 import { Logger } from "../../utils/logger.js";
-import { addAddressQuickNodeSchema } from "../../utils/schemas/quicknode.schema.js";
+import { addAddressQuickNodeSchema, notifyTxQuickNodeSchema } from "../../utils/schemas/quicknode.schema.js";
 import { DecodedEvent, DecodedTransferEvent, ProtocolEventType, QuickNodeNotification, TradeFromQuickNode } from "../../utils/types.js";
 import { env } from "../../env.js";
-import { decodeEventLog, parseAbi, TransactionReceipt } from "viem";
+import { decodeEventLog, parseAbi } from "viem";
 import { events, TransferAbi } from "../../utils/constants.js";
 
 const logger = new Logger("testHandler");
@@ -88,8 +88,13 @@ export async function addAddressToScan(req: Request, res: Response) {
 
 export async function notifyTx(req: Request, res: Response) {
   try {
+    const txs = notifyTxQuickNodeSchema.safeParse(req.body);
 
-    const txs = req.body;
+    if (!txs.success) {
+      logger.error(`Error ${JSON.stringify(txs.error.errors)}`);
+      res.status(400).json({ error: txs.error.errors });
+    }
+
     const transferAbi = parseAbi([TransferAbi]);
   
     let trade: TradeFromQuickNode;
@@ -98,7 +103,7 @@ export async function notifyTx(req: Request, res: Response) {
     let tradeAmountIn: bigint = 0n;
     let tradeAmountOut: bigint = 0n;
   
-    txs.forEach((tx: TransactionReceipt) => {
+    txs.data!.forEach((tx) => {
       let swapEvents: DecodedEvent[] = []
       let transferEvents: DecodedTransferEvent[] = []
       mainLoop:

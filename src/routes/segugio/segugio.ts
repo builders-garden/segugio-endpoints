@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { createSegugioSchema } from "../../utils/schemas/segugio.schema.js";
+import { createSegugioSchema, fireTxSchema } from "../../utils/schemas/segugio.schema.js";
 import { Logger } from "../../utils/logger.js";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
@@ -88,13 +88,19 @@ export async function createSegugio(
   }
 */
 export async function fireTx(req: Request, res: Response): Promise<void> {
-  // TODO: add here body parsing (done by bianc8)
-  const parsedBody = req.body;
+  const parsedBody = fireTxSchema.safeParse(req.body);
+
+  if (!parsedBody.success) {
+    logger.error(`Error ${JSON.stringify(parsedBody.error.errors)}`);
+    res.status(400).json({ error: parsedBody.error.errors });
+  }
+
+  const reqBody = parsedBody.data!;
 
   // take here the segugios from db to get the targets of the transaction
-  logger.log(`looking for segugios for target ${parsedBody.from}`);
-  const segugios = await getSegugiosByTarget(parsedBody.from);
-  logger.log(`found ${segugios.length} segugios for target ${parsedBody.from}`);
+  logger.log(`looking for segugios for target ${reqBody.from}`);
+  const segugios = await getSegugiosByTarget(reqBody.from);
+  logger.log(`found ${segugios.length} segugios for target ${reqBody.from}`);
 
   const executedTransactions: {
     hash: string;
@@ -111,16 +117,16 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
     error: SendTransactionErrorType;
   }[] = [];
   for (var segugio of segugios) {
-    let prompt = parsedBody.prompt;
-    if (!prompt) {
-      if (!parsedBody.tokenOut || !parsedBody.amount) {
-        res.status(400).json({
-          error: "tokenIn is required if you do not provide a prompt",
-        });
-        return;
-      }
-      prompt = `Swap ${parsedBody.amount}$ ${segugio.tokenFrom} to ${parsedBody.tokenOut} on Base mainnet`;
+    let prompt;
+    // if (!prompt) {
+    if (!reqBody.tokenOut || !reqBody.amountOut) {
+      res.status(400).json({
+        error: "tokenIn is required if you do not provide a prompt",
+      });
+      return;
     }
+    prompt = `Swap ${reqBody.amountOut}$ ${segugio.tokenFrom} to ${reqBody.tokenOut} on Base mainnet`;
+    // }
     logger.log(`Using prompt: ${prompt}`);
     logger.log(
       `executing transaction for segugio ${segugio.address} from user ${segugio.owner}`

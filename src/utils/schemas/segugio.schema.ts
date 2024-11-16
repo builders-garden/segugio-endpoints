@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TradeFromQuickNode } from "../types.js";
 
 export const createSegugioSchema = z.object({
   owner: z
@@ -47,3 +48,21 @@ export const createSegugioSchema = z.object({
     .describe("The default token to be used for the swap")
     .default("USDC"),
 });
+
+export const fireTxSchema = z.custom<TradeFromQuickNode>((trade: TradeFromQuickNode) => {
+  if (!trade.amountIn || !trade.amountOut) {
+    throw new Error("Trade must have an amountIn and amountOut");
+  }
+  if (!trade.from) {
+    throw new Error("Trade must have a from address");
+  }
+  if (!trade.protocol) {
+    throw new Error("Trade must have a protocol");
+  }
+  if (!trade.tokenIn) {
+    throw new Error("Trade must have a tokenIn");
+  }
+  if (!trade.tokenOut) {
+    throw new Error("Trade must have a tokenOut");
+  }
+})

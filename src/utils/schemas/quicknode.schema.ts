@@ -9,9 +9,8 @@ export const addAddressQuickNodeSchema = z.object({
     .describe("The Ethereum address of the user to copy trade"),
 });
 
-export const notifyTxQuickNodeSchema = z.array(z.custom<TransactionReceipt>((tx) => {
-  if (tx.to === undefined) {
-    throw new Error("Transaction receipt must have a to field");
+export const notifyTxQuickNodeSchema = z.array(z.custom<TransactionReceipt>((tx: TransactionReceipt) => {
+  if (tx.status !== "success") {
+    throw new Error("Transaction must have a success status");
   }
-  return tx;
 }))

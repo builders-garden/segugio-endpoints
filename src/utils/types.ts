@@ -69,7 +69,7 @@ export type ProtocolEvent = {
   amountOut: string | string[] | undefined;
 }
 
-export type TradeFromQuickNode = {
+export type QuickNodeTrade = {
   from: string;
   protocol: string;
   tokenIn: string;
@@ -92,4 +92,31 @@ export type DecodedTransferEvent = {
     to: `0x${string}`;
     value: bigint;
   }
+}
+
+export type QuickNodeTx = {
+  blockHash: string;
+  blockNumber: string;
+  contractAddress: string;
+  cumulativeGasUsed: string;
+  effectiveGasPrice: string;
+  from: string;
+  gasUsed: string;
+  logs: Array<{
+    address: string;
+    blockHash: string;
+    blockNumber: bigint;
+    data: string;
+    logIndex: number;
+    removed: boolean;
+    topics: string[];
+    transactionHash: string;
+    transactionIndex: number;
+  }>;
+  logsBloom: string;
+  status: string;
+  to: string;
+  transactionHash: string;
+  transactionIndex: string;
+  type: string;
 }

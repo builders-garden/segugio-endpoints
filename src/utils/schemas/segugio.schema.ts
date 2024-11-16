@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { TradeFromQuickNode } from "../types.js";
 
 export const createSegugioSchema = z.object({
   owner: z
@@ -49,20 +48,35 @@ export const createSegugioSchema = z.object({
     .default("USDC"),
 });
 
-export const fireTxSchema = z.custom<TradeFromQuickNode>((trade: TradeFromQuickNode) => {
-  if (!trade.amountIn || !trade.amountOut) {
-    throw new Error("Trade must have an amountIn and amountOut");
-  }
-  if (!trade.from) {
-    throw new Error("Trade must have a from address");
-  }
-  if (!trade.protocol) {
-    throw new Error("Trade must have a protocol");
-  }
-  if (!trade.tokenIn) {
-    throw new Error("Trade must have a tokenIn");
-  }
-  if (!trade.tokenOut) {
-    throw new Error("Trade must have a tokenOut");
-  }
-})
+export const fireTxSchema = z.object({
+  from: z
+    .string({
+      required_error: "From address is required",
+    })
+    .describe("The address of the user to copy trade"),
+  protocol: z
+    .string({
+      required_error: "Protocol is required",
+    })
+    .describe("The protocol of the trade"),
+  tokenIn: z
+    .string({
+      required_error: "Token in is required",
+    })
+    .describe("The token to be swapped - address"),
+  tokenOut: z
+    .string({
+      required_error: "Token out is required",
+    })
+    .describe("The token to receive - address"),
+  amountIn: z
+    .bigint({
+      required_error: "Amount in is required",
+    })
+    .describe("The amount of token to swap - bigint"),
+  amountOut: z
+    .bigint({
+      required_error: "Amount out is required",
+    })
+    .describe("The amount of token to receive - bigint"),
+});

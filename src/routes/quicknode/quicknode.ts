@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
 import { Logger } from "../../utils/logger.js";
 import { addAddressQuickNodeSchema, notifyTxQuickNodeSchema } from "../../utils/schemas/quicknode.schema.js";
-import { DecodedEvent, DecodedTransferEvent, ProtocolEventType, QuickNodeNotification, TradeFromQuickNode } from "../../utils/types.js";
+import { DecodedEvent, DecodedTransferEvent, ProtocolEventType, QuickNodeNotification, QuickNodeTrade } from "../../utils/types.js";
 import { env } from "../../env.js";
-import { decodeEventLog, parseAbi } from "viem";
+import { decodeEventLog, Log, parseAbi } from "viem";
 import { events, TransferAbi } from "../../utils/constants.js";
 
 const logger = new Logger("testHandler");
@@ -88,22 +88,22 @@ export async function addAddressToScan(req: Request, res: Response) {
 
 export async function notifyTx(req: Request, res: Response) {
   try {
-    const txs = notifyTxQuickNodeSchema.safeParse(req.body);
+    const parsed = notifyTxQuickNodeSchema.safeParse(req.body);
 
-    if (!txs.success) {
-      logger.error(`Error ${JSON.stringify(txs.error.errors)}`);
-      res.status(400).json({ error: txs.error.errors });
+    if (!parsed.success) {
+      logger.error(`Error ${JSON.stringify(parsed.error.errors)}`);
+      res.status(400).json({ error: parsed.error.errors });
     }
 
     const transferAbi = parseAbi([TransferAbi]);
   
-    let trade: TradeFromQuickNode;
+    let trade: QuickNodeTrade;
     let tradeTokenIn: string | undefined;
     let tradeTokenOut: string | undefined;
     let tradeAmountIn: bigint = 0n;
     let tradeAmountOut: bigint = 0n;
   
-    txs.data!.forEach((tx) => {
+    parsed.data!.forEach((tx) => {
       let swapEvents: DecodedEvent[] = []
       let transferEvents: DecodedTransferEvent[] = []
       mainLoop:
@@ -121,8 +121,8 @@ export async function notifyTx(req: Request, res: Response) {
               const abi = parseAbi([event.name]);
               const decodedSwapLog = decodeEventLog({
                 abi,
-                topics: log.topics,
-                data: log.data,
+                topics: log.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
+                data: log.data as `0x${string}`,
               });
               if (decodedSwapLog?.args) {
                 if (event.type === ProtocolEventType.Aggregator) {
@@ -137,7 +137,7 @@ export async function notifyTx(req: Request, res: Response) {
                   break mainLoop;
                 } else {
                   swapEvents.push({
-                    encodedLog: log,
+                    encodedLog: log as unknown as Log<bigint, number, false>,
                     ...decodedSwapLog
                   })
                   break firstLogsLoop;
@@ -153,21 +153,21 @@ export async function notifyTx(req: Request, res: Response) {
           try {
             const decodedSwapLog = decodeEventLog({
               abi: parseAbi([event.name]),
-              topics: log.topics,
-              data: log.data,
+              topics: log.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
+              data: log.data as `0x${string}`,
             });
-            if (decodedSwapLog?.args && !swapEvents.includes({encodedLog: log, ...decodedSwapLog})) {
-              swapEvents.push({encodedLog: log, ...decodedSwapLog})
+            if (decodedSwapLog?.args && !swapEvents.includes({encodedLog: log as unknown as Log<bigint, number, false>, ...decodedSwapLog})) {
+              swapEvents.push({encodedLog: log as unknown as Log<bigint, number, false>, ...decodedSwapLog})
             }
           } catch {
             try {
               const decodedTransferLog = decodeEventLog({
                 abi: transferAbi,
-                topics: log.topics,
-                data: log.data
+                topics: log.topics as [signature: `0x${string}`, ...args: `0x${string}`[]],
+                data: log.data as `0x${string}`,
               })
               if (decodedTransferLog?.args) {
-                transferEvents.push({encodedLog: log, ...decodedTransferLog})
+                transferEvents.push({encodedLog: log as unknown as Log<bigint, number, false>, ...decodedTransferLog})
               }
             } catch {}
           }

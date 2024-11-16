@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { TransactionReceipt } from "viem";
 
 export const addAddressQuickNodeSchema = z.object({
   address: z
@@ -9,8 +8,33 @@ export const addAddressQuickNodeSchema = z.object({
     .describe("The Ethereum address of the user to copy trade"),
 });
 
-export const notifyTxQuickNodeSchema = z.array(z.custom<TransactionReceipt>((tx: TransactionReceipt) => {
-  if (tx.status !== "success") {
-    throw new Error("Transaction must have a success status");
-  }
-}))
+export const notifyTxQuickNodeSchema = z.array(
+  z.object({
+    blockHash: z.string(),
+    blockNumber: z.string(),
+    contractAddress: z.string(),
+    cumulativeGasUsed: z.string(),
+    effectiveGasPrice: z.string(),
+    from: z.string(),
+    gasUsed: z.string(),
+    logs: z.array(
+      z.object({
+        address: z.string(),
+        blockHash: z.string(),
+        blockNumber: z.string(),
+        data: z.string(),
+        logIndex: z.string(),
+        removed: z.boolean(),
+        topics: z.array(z.string()),
+        transactionHash: z.string(),
+        transactionIndex: z.string(),
+      })
+    ),
+    logsBloom: z.string(),
+    status: z.string(),
+    to: z.string(),
+    transactionHash: z.string(),
+    transactionIndex: z.string(),
+    type: z.string(),
+  })
+);

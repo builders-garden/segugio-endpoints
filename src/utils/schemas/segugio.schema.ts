@@ -1,6 +1,11 @@
 import { z } from "zod";
 
 export const createSegugioSchema = z.object({
+  owner: z
+    .string()
+    .min(1)
+    .max(42)
+    .describe("The Ethereum address of the owner"),
   segugioToolParams: z.object({
     ensDomain: z
       .string()
@@ -22,7 +27,6 @@ export const createSegugioSchema = z.object({
     .describe("The Ethereum address of the user to copy trade"),
   timeRange: z
     .enum(["1h", "1d", "1w", "1m", "1y"])
-    .nullish()
     .describe("The time range for how long to copy trades")
     .default("1w"),
   onlyBuyTrades: z

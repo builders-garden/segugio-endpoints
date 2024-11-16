@@ -30,19 +30,6 @@ export const saveSegugio = async (segugioValues: Segugio) => {
   });
 };
 
-// export const saveTarget = async (segugioId: number, targetValues: Target) => {
-//   await db.insert(targetTable).values({
-//     segugioId: segugioId,
-//     ensDomain: targetValues.ensDomain,
-//     address: targetValues.address,
-//     resolvedEnsDomain: targetValues.resolvedEnsDomain,
-//     timeRange: targetValues.timeRange,
-//     onlyBuyTrades: targetValues.onlyBuyTrades,
-//     portfolioPercentage: targetValues.portfolioPercentage,
-//     tokenFrom: targetValues.tokenFrom,
-//   });
-// };
-
 // export const saveTrade = async (segugioId: number, tradeValues: Trade) => {
 //   await db.insert(tradeTable).values({
 //     segugioId: segugioId,
@@ -57,23 +44,19 @@ export const saveSegugio = async (segugioValues: Segugio) => {
 //   });
 // };
 
-export const getSegugio = async (address: string) => {
-  const segugio = await db.query.segugioTable.findFirst({
-    where: eq(segugioTable.address, address),
-    with: {
-      targets: true,
-      trades: true,
-    },
+export const getSegugiosByTarget = async (target: string) => {
+  const segugio = await db.query.segugioTable.findMany({
+    where: eq(segugioTable.target, target),
   });
   return segugio;
 };
 
-// export const getTargets = async (segugioId: number) => {
-//   const targets = await db.query.targetTable.findMany({
-//     where: eq(targetTable.segugioId, segugioId),
-//   });
-//   return targets;
-// };
+export const getSegugiosByOwner = async (owner: string) => {
+  const segugio = await db.query.segugioTable.findMany({
+    where: eq(segugioTable.owner, owner),
+  });
+  return segugio;
+};
 
 export const getTrades = async (segugioId: number) => {
   const trades = await db.query.tradeTable.findMany({

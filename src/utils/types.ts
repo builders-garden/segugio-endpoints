@@ -11,7 +11,7 @@ export type Segugio = {
   onlyBuyTrades: boolean;
   portfolioPercentage: number;
   tokenFrom: string;
-  trades: Trade[]; // trades that the segugio has made
+  trades?: Trade[]; // trades that the segugio has made
 };
 
 // export type Target = {

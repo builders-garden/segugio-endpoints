@@ -1,15 +1,24 @@
 import type { Request, Response } from "express";
 import { createSegugioSchema } from "../../utils/schemas/segugio.schema.js";
 import { Logger } from "../../utils/logger.js";
-import { env } from "../../env.js";
-import { privateKeyToAccount } from "viem/accounts";
-import { createWalletClient, http, publicActions } from "viem";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import {
+  Address,
+  createWalletClient,
+  http,
+  publicActions,
+  SendTransactionErrorType,
+} from "viem";
 import { base } from "viem/chains";
 import { brianTransact } from "../../utils/brian.js";
 import { Token } from "@brian-ai/sdk";
+import { getSegugiosByTarget, saveSegugio } from "../../utils/db.js";
 
-const logger = new Logger("testHandler");
-export function createSegugio(req: Request, res: Response): void {
+const logger = new Logger("segugio-controller");
+export async function createSegugio(
+  req: Request,
+  res: Response
+): Promise<void> {
   logger.log("Creating segugio...");
   const parsedBody = createSegugioSchema.safeParse(req.body);
 
@@ -17,13 +26,48 @@ export function createSegugio(req: Request, res: Response): void {
     logger.error(`Error ${JSON.stringify(parsedBody.error.errors)}`);
     res.status(400).json({ error: parsedBody.error.errors });
   } else {
-    logger.log(`Successfully parsed body ${JSON.stringify(parsedBody.data)}`);
-    // TODO: create segugio
-    // if no priv key for user address, create one
-    // else, add to segugio list
+    // create new Segugio wallet
+    const newPrivateKey = generatePrivateKey();
+    const account = privateKeyToAccount(newPrivateKey);
+
+    const segugio = {
+      owner: parsedBody.data.owner,
+      target: parsedBody.data.addressToFollow,
+      privateKey: newPrivateKey,
+      address: account.address,
+      ensDomain: parsedBody.data.segugioToolParams.ensDomain || null,
+      resolvedEnsDomain:
+        parsedBody.data.segugioToolParams.resolvedEnsDomain || null,
+      timeRange: parsedBody.data.timeRange,
+      onlyBuyTrades: parsedBody.data.onlyBuyTrades ?? true,
+      portfolioPercentage: parsedBody.data.portfolioPercentage ?? 0.1,
+      tokenFrom: parsedBody.data.tokenFrom ?? "USDC",
+    };
+    // console.log("the new segugio will be: ", segugio);
+    // store the Segugio in the database
+    await saveSegugio(segugio);
+    logger.log(
+      `New Segugio created and stored for ${parsedBody.data.addressToFollow} with address ${segugio.address}`
+    );
+
+    // TODO: add here a ping to the webhook of the Caso to notify the new segugio
+
     res.status(200).json({
-      address: parsedBody.data.addressToFollow,
-      message: `Successfully created segugio for ${parsedBody.data.addressToFollow}`,
+      status: "ok",
+      data: {
+        message: `Successfully created segugio for ${parsedBody.data.addressToFollow} with address ${segugio.address}`,
+        segugio: {
+          owner: segugio.owner,
+          address: segugio.address,
+          target: segugio.target,
+          ensDomain: segugio.ensDomain,
+          resolvedEnsDomain: segugio.resolvedEnsDomain,
+          timeRange: segugio.timeRange,
+          onlyBuyTrades: segugio.onlyBuyTrades,
+          portfolioPercentage: segugio.portfolioPercentage,
+          tokenFrom: segugio.tokenFrom,
+        },
+      },
     });
   }
 }
@@ -37,41 +81,20 @@ export function createSegugio(req: Request, res: Response): void {
   } || {
     "from": "0x1234567890",
     "protocol": "Uniswap",
-    "tokenIn": "ETH" | "0x32434354354354"
+    "tokenIn": "ETH" | "0x32434354354354",
     "tokenOut": "DAI",
     "amountIn": "1",
     "amountOut": "100",
   }
 */
 export async function fireTx(req: Request, res: Response): Promise<void> {
-  console.log(req.body);
+  // TODO: add here body parsing (done by bianc8)
   const parsedBody = req.body;
 
-  let prompt = parsedBody.prompt;
-  if (!prompt) {
-    if (!parsedBody.tokenIn) {
-      res
-        .status(400)
-        .json({ error: "tokenIn is required if you do not provide a prompt" });
-      return;
-    }
-    prompt = `Swap ${parsedBody.amount} ${parsedBody.defaultUserToken} to ${parsedBody.tokenIn} on Base mainnet`;
-  }
   // take here the segugios from db to get the targets of the transaction
-  // const segugios = [""];
-
-  // TODO: this will be replaced by private key on backend
-  const privateKey = env.PRIVATE_KEY;
-
-  const account = privateKeyToAccount(`0x${privateKey}`);
-  const walletClient = createWalletClient({
-    account,
-    chain: base,
-    transport: http(),
-  }).extend(publicActions);
-
-  const brianResponse = await brianTransact(prompt, account.address);
-  console.log(JSON.stringify(brianResponse, null, 2));
+  logger.log(`looking for segugios for target ${parsedBody.from}`);
+  const segugios = await getSegugiosByTarget(parsedBody.from);
+  logger.log(`found ${segugios.length} segugios for target ${parsedBody.from}`);
 
   const executedTransactions: {
     hash: string;
@@ -79,44 +102,99 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
     fromToken: Token | undefined;
     toToken: Token | undefined;
     receiver: string;
+    prompt: string;
   }[] = [];
-  for (var transactionResult of brianResponse) {
-    logger.log(
-      `reading transaction result with solver ${transactionResult.solver} and action ${transactionResult.action}`
-    );
-    if (transactionResult.action !== "swap") {
-      logger.error(
-        `Action ${transactionResult.action} is not supported. Skipping...`
-      );
-      continue;
+  const failedTransactions: {
+    segugioId: number;
+    target: string;
+    owner: string;
+    error: SendTransactionErrorType;
+  }[] = [];
+  for (var segugio of segugios) {
+    let prompt = parsedBody.prompt;
+    if (!prompt) {
+      if (!parsedBody.tokenOut || !parsedBody.amount) {
+        res.status(400).json({
+          error: "tokenIn is required if you do not provide a prompt",
+        });
+        return;
+      }
+      prompt = `Swap ${parsedBody.amount}$ ${segugio.tokenFrom} to ${parsedBody.tokenOut} on Base mainnet`;
     }
-    if (
-      transactionResult.data.steps &&
-      transactionResult.data.steps?.length >= 0
-    ) {
-      for (var step of transactionResult.data.steps) {
-        const result = await walletClient.sendTransaction({
-          from: step.from,
-          to: step.to,
-          data: step.data,
-          value: BigInt(step.value),
-        });
-        logger.log(`Transaction result hash: ${result}`);
-        executedTransactions.push({
-          hash: result,
-          action: transactionResult.action,
-          fromToken: transactionResult.data.fromToken,
-          toToken: transactionResult.data.toToken,
-          receiver: (transactionResult.data as any).receiver,
-        });
+    logger.log(`Using prompt: ${prompt}`);
+    logger.log(
+      `executing transaction for segugio ${segugio.address} from user ${segugio.owner}`
+    );
+    const privateKey = segugio.privateKey;
+
+    const account = privateKeyToAccount(
+      (privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`) as Address
+    );
+    const walletClient = createWalletClient({
+      account,
+      chain: base,
+      transport: http(),
+    }).extend(publicActions);
+
+    const brianResponse = await brianTransact(prompt, account.address);
+    // console.log(JSON.stringify(brianResponse, null, 2));
+
+    for (var transactionResult of brianResponse) {
+      logger.log(
+        `reading transaction result with solver ${transactionResult.solver} and action ${transactionResult.action}`
+      );
+      if (transactionResult.action !== "swap") {
+        logger.error(
+          `action ${transactionResult.action} is not supported. Skipping...`
+        );
+        continue;
+      }
+      if (
+        transactionResult.data.steps &&
+        transactionResult.data.steps?.length >= 0
+      ) {
+        for (var step of transactionResult.data.steps) {
+          try {
+            const result = await walletClient.sendTransaction({
+              from: step.from,
+              to: step.to,
+              data: step.data,
+              value: BigInt(step.value),
+            });
+            logger.log(`Transaction result hash: ${result}`);
+            executedTransactions.push({
+              hash: result,
+              action: transactionResult.action,
+              fromToken: transactionResult.data.fromToken,
+              toToken: transactionResult.data.toToken,
+              receiver: (transactionResult.data as any).receiver,
+              prompt: prompt,
+            });
+          } catch (error) {
+            const e = error as SendTransactionErrorType;
+            logger.error(
+              `error executing tx for segugio ${segugio.id}: ${e.message.slice(
+                0,
+                e.message.indexOf("\n")
+              )}`
+            );
+            failedTransactions.push({
+              segugioId: segugio.id,
+              target: segugio.target,
+              owner: segugio.owner,
+              error: e,
+            });
+          }
+        }
       }
     }
   }
+
   res.status(200).json({
     status: "ok",
     data: {
-      prompt,
       executedTransactions,
+      failedTransactions,
     },
   });
 }

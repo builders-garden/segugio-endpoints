@@ -29,6 +29,8 @@ import { Segugio } from "../../utils/types.js";
 
 const logger = new Logger("segugio");
 
+const BLOCKSCOUT_URL = "${BLOCKSCOUT_URL}";
+
 export async function createSegugio(
   req: Request,
   res: Response
@@ -81,7 +83,7 @@ export async function createSegugio(
         xmtpGroupId: parsedBody.data.xmtpGroupId,
       };
 
-      const result = await axios(
+      let result = await axios(
         `${env.APP_BASE_URL}/quicknode/add-address-to-scan`,
         {
           method: "POST",
@@ -175,7 +177,7 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
       error: SendTransactionErrorType;
     }[] = [];
 
-    const result = await axios(
+    let result = await axios(
       `${env.APP_BASE_URL}/1inch/tokens-data?addresses=${reqBody.tokenOut}`,
       {
         method: "GET",
@@ -221,6 +223,14 @@ export async function fireTx(req: Request, res: Response): Promise<void> {
 
       executedTransactions.push(...executed);
       failedTransactions.push(...failed);
+  
+      await sendMessageToXmtpBot(
+        segugio.xmtpGroupId,
+        segugio.owner,
+        segugio.address,
+        `Transaction executed: ${prompt}`,
+        executedTransactions[0].hash
+      );
     }
 
     res.status(200).json({
@@ -268,6 +278,7 @@ export async function swapTx(req: Request, res: Response): Promise<void> {
       status: "ok",
       data: {
         message: `Transaction executed in your segugio ${segugio.address}. Swapped ${amount}$ of ${tokenIn} for ${tokenOut}`,
+        blockScoutUrl: `${BLOCKSCOUT_URL}/tx/${executedTransactions[0].hash}`,
         executedTransactions,
         failedTransactions,
       },
@@ -316,6 +327,7 @@ export async function withdraw(req: Request, res: Response): Promise<void> {
       status: "ok",
       data: {
         message: `Transaction executed in your segugio ${segugio.address}. Transferred ${amount}$ of ${tokenToTransfer} to ${segugio.owner}`,
+        blockScoutUrl: `${BLOCKSCOUT_URL}/tx/${executedTransactions[0].hash}`,
         executedTransactions,
         failedTransactions,
       },
@@ -411,4 +423,36 @@ async function executeBrianTransactionsForSegugio(
   }
 
   return { executedTransactions, failedTransactions };
+}
+
+async function sendMessageToXmtpBot(
+  groupId: string,
+  userAddress: string,
+  botAddress: string,
+  message: string,
+  txHash: string
+) {
+  message += `\nCheck the transaction on Blockscout: ${BLOCKSCOUT_URL}/tx/${txHash}`;
+
+  const result = await axios(`${env.XMTP_BOT_URL}/send-message`, {
+    method: "POST",
+    data: {
+      groupId,
+      userAddress,
+      botAddress,
+      message,
+      txHash,
+      blockScoutUrl: `${BLOCKSCOUT_URL}/tx/${txHash}`,
+    },
+  });
+
+  if (result.status !== 200) {
+    logger.error(
+      `Error sending message to XMTP bot for segugio ${groupId}: ${result.data}`
+    );
+    return false;
+  }
+
+  logger.log(`Message sent to XMTP bot for segugio ${groupId}`);
+  return true;
 }

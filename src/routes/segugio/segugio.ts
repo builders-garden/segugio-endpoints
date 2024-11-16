@@ -267,6 +267,7 @@ export async function swapTx(req: Request, res: Response): Promise<void> {
     res.status(200).json({
       status: "ok",
       data: {
+        message: `Transaction executed in your segugio ${segugio.address}. Swapped ${amount}$ of ${tokenIn} for ${tokenOut}`,
         executedTransactions,
         failedTransactions,
       },
@@ -314,6 +315,7 @@ export async function withdraw(req: Request, res: Response): Promise<void> {
     res.status(200).json({
       status: "ok",
       data: {
+        message: `Transaction executed in your segugio ${segugio.address}. Transferred ${amount}$ of ${tokenToTransfer} to ${segugio.owner}`,
         executedTransactions,
         failedTransactions,
       },

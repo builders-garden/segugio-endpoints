@@ -55,7 +55,9 @@ export async function createSegugio(
     res.status(200).json({
       status: "ok",
       data: {
-        message: `Successfully created segugio for ${parsedBody.data.addressToFollow} with address ${segugio.address}`,
+        message: `Segugio created successfully for ${
+          segugio.ensDomain ?? segugio.target
+        } with address ${segugio.address}`,
         segugio: {
           owner: segugio.owner,
           address: segugio.address,

@@ -15,6 +15,7 @@ const envSchema = z.object({
   TURSO_AUTH_TOKEN: z.string().trim().min(1),
   QUICKNODE_API_KEY: z.string().trim().min(1),
   QUICKNODE_NOTIFICATION_ID: z.string().trim().min(1),
+  ONEINCH_API_KEY: z.string().trim().min(1),
 });
 
 const { data, success, error } = envSchema.safeParse(process.env);

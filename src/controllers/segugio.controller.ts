@@ -10,6 +10,9 @@ export function createSegugio(req: Request, res: Response): void {
     res.status(400).json({ error: parsedBody.error.errors });
   } else {
     console.log("Successfully parsed body", parsedBody.data);
-    res.send("Successfully created segugio for limone.eth");
+    res.status(200).json({
+      address: parsedBody.data.addressToFollow,
+      message: `Successfully created segugio for ${parsedBody.data.addressToFollow}`,
+    });
   }
 }

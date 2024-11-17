@@ -30,7 +30,7 @@ import { Segugio } from "../../utils/types.js";
 
 const logger = new Logger("segugio");
 
-const BLOCKSCOUT_URL = "${BLOCKSCOUT_URL}";
+const BLOCKSCOUT_URL = "https://base.blockscout.com";
 
 export async function createSegugio(
   req: Request,

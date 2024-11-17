@@ -136,3 +136,36 @@ export type OneInchTokenData = {
     rating: number;
   };
 };
+
+export type OneInchPnL = {
+  result: Array<{
+    chain_id: number | null;
+    abs_profit_usd: number;
+    roi: number;
+  }>;
+  meta: {
+    system: {
+      click_time: number;
+      node_time: number;
+      microservices_time: number;
+      redis_time: number;
+      total_time: number;
+    };
+  };
+}
+    
+export type OneInchGeneralValue = {
+  result: Array<{
+    address: string;
+    value_usd: number;
+  }>;
+  meta: {
+    system: {
+      click_time: number;
+      node_time: number;
+      microservices_time: number;
+      redis_time: number;
+      total_time: number;
+    };
+  };
+}

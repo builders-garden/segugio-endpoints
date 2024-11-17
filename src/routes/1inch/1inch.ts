@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { env } from "../../env.js";
 import axios from "axios";
-import { OneInchTokenData } from "../../utils/types.js";
+import { OneInchPnL, OneInchTokenData } from "../../utils/types.js";
 
 const ONEINCH_BASE_URL = "https://api.1inch.dev";
 const chainId = "8453";
@@ -28,6 +28,7 @@ export async function getMultiPortfolio(req: Request, res: Response) {
 
   try {
     const response = await axios.get(url, config);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log(response.data);
 
     res.status(200).json({
@@ -64,11 +65,11 @@ export async function generalProfitAndLoss(req: Request, res: Response) {
 
   try {
     const response = await axios.get(url, config);
-    console.log(response.data);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     res.status(200).json({
       status: "ok",
       data: {
-        profitAndLoss: response.data,
+        profitAndLoss: response.data as OneInchPnL,
       },
     });
   } catch (error) {
@@ -82,24 +83,25 @@ export async function generalProfitAndLoss(req: Request, res: Response) {
 
 export async function generalCurrentValue(req: Request, res: Response) {
   const { addresses } = req.query;
-  const url = `${ONEINCH_BASE_URL}/portfolio/portfolio/v4/general/current_value`;
+
+  const url = "https://api.1inch.dev/portfolio/portfolio/v4/general/current_value";
 
   const config = {
-    headers: {
-      Authorization: `Bearer ${env.ONEINCH_API_KEY}`,
-    },
-    params: {
-      addresses: addresses,
-      chain_id: chainId,
-    },
-    paramsSerializer: {
-      indexes: null,
-    },
+      headers: {
+  "Authorization": `Bearer ${env.ONEINCH_API_KEY}`
+},
+      params: {
+  "addresses": addresses,
+  "chain_id": "8453"
+},
+      paramsSerializer: {
+        indexes: null
+      }
   };
-
+  
   try {
     const response = await axios.get(url, config);
-    console.log(response.data);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     res.status(200).json({
       status: "ok",
       data: {
@@ -136,6 +138,7 @@ export async function getTokenDetails(req: Request, res: Response) {
 
   try {
     const response = await axios.get(url, config);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     res.status(200).json({
       status: "ok",
       data: {
@@ -169,6 +172,7 @@ export async function getTokensData(req: Request, res: Response) {
 
   try {
     const response = await axios.get(url, config);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     res.status(200).json({
       status: "ok",
       data: {

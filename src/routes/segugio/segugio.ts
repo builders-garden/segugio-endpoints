@@ -20,12 +20,13 @@ import { Token } from "@brian-ai/sdk";
 import {
   checkDuplicateSegugio,
   getSegugioByTargetAndOwner,
+  getSegugiosByOwner,
   getSegugiosByTarget,
   saveSegugio,
 } from "../../utils/db.js";
 import axios from "axios";
 import { env } from "../../env.js";
-import { OneInchTokenData } from "../../utils/types.js";
+import { OneInchGeneralValue, OneInchPnL, OneInchTokenData } from "../../utils/types.js";
 import { Segugio } from "../../utils/types.js";
 
 const logger = new Logger("segugio");
@@ -114,12 +115,55 @@ export async function createSegugio(
         `New Segugio created and stored for ${parsedBody.data.addressToFollow} with address ${segugio.address}`
       );
 
+      result = await axios(
+        `${env.APP_BASE_URL}/1inch/profit-and-loss?addresses=${parsedBody.data.addressToFollow}`,
+        {
+          method: "GET",
+        }
+      );
+  
+      if (result.status !== 200) {
+        logger.error(
+          `Error getting profit and loss for ${parsedBody.data.addressToFollow}: ${result.data}`
+        );
+        res.status(500).json({
+          error: `Error getting profit and loss for ${parsedBody.data.addressToFollow}: ${result.data}`,
+        });
+        return;
+      }
+
+      const profitAndLoss = result.data.data.profitAndLoss as OneInchPnL;
+      const baseResult = profitAndLoss.result.find(
+        (pnl) => pnl.chain_id === base.id
+      );
+      const pnlUsd = baseResult?.abs_profit_usd.toFixed(2);
+      const roi = baseResult?.roi ? (baseResult?.roi * 100).toFixed(4) : 0;
+
+      result = await axios(
+        `${env.APP_BASE_URL}/1inch/current-value?addresses=${parsedBody.data.addressToFollow}`,
+        {
+          method: "GET",
+        }
+      );
+
+      if (result.status !== 200) {
+        logger.error(
+          `Error getting current value for ${parsedBody.data.addressToFollow}: ${result.data}`
+        );
+        res.status(500).json({
+          error: `Error getting current value for ${parsedBody.data.addressToFollow}: ${result.data}`,
+        });
+        return;
+      }
+
+      const currentValue = (result.data.data.currentValue as OneInchGeneralValue).result[0].value_usd.toFixed(2);
+
       res.status(200).json({
         status: "ok",
         data: {
           message: `Segugio created successfully for ${
             segugio.ensDomain ?? segugio.target
-          } with address ${segugio.address}`,
+          } with address ${segugio.address}. PnL in USD: \$${pnlUsd}, ROI: ${roi}\%, Current Value: \$${currentValue}`,
           segugio: {
             owner: segugio.owner,
             address: segugio.address,
@@ -299,6 +343,153 @@ export async function swapTx(req: Request, res: Response): Promise<void> {
       status: "nok",
       data: {
         message: `Error selling token: ${error}`,
+      },
+    });
+  }
+}
+
+export async function getStats(req: Request, res: Response): Promise<void> {
+  try {
+    const { owner, target } = req.body;
+
+    if (!owner) {
+      res.status(400).json({
+        status: "nok",
+        data: {
+          message: "Owner is required",
+        },
+      });
+      return;
+    }
+
+    let message = "";
+
+    if (target) {
+      const segugio = await getSegugioByTargetAndOwner(target, owner);
+      if (!segugio) {
+        res.status(404).json({
+          status: "nok",
+          data: {
+            message: `Segugio not found for target ${target} and owner ${owner}`,
+          },
+        });
+        return;
+      }
+
+      let result = await axios(
+        `${env.APP_BASE_URL}/1inch/profit-and-loss?addresses=${target}`,
+        {
+          method: "GET",
+        }
+      );
+
+      if (result.status !== 200) {
+        logger.error(
+          `Error getting profit and loss for ${target}: ${result.data}`
+        );
+        res.status(500).json({
+          error: `Error getting profit and loss for ${target}: ${result.data}`,
+        });
+        return;
+      }
+
+      const profitAndLoss = result.data.data.profitAndLoss as OneInchPnL;
+      const baseResult = profitAndLoss.result.find(
+        (pnl) => pnl.chain_id === base.id
+      );
+      const pnlUsd = baseResult?.abs_profit_usd.toFixed(2);
+      const roi = baseResult?.roi ? (baseResult?.roi * 100).toFixed(4) : 0;
+
+      result = await axios(
+        `${env.APP_BASE_URL}/1inch/current-value?addresses=${target}`,
+        {
+          method: "GET",
+        }
+      );
+
+      if (result.status !== 200) {
+        logger.error(
+          `Error getting current value for ${target}: ${result.data}`
+        );
+        res.status(500).json({
+          error: `Error getting current value for ${target}: ${result.data}`,
+        });
+        return;
+      }
+
+      const currentValue = (result.data.data.currentValue as OneInchGeneralValue).result[0].value_usd.toFixed(2);
+
+      message += `Segugio stats for ${segugio.ensDomain ?? segugio.target}\n\nPnL in USD: \$${pnlUsd}\nROI: ${roi}\%\nCurrent Value: \$${currentValue}`;
+    }
+
+    const segugios = await getSegugiosByOwner(owner);
+    
+    // we want to do again the calls, but this time we'll have in the queries ?addresses=${segugio0}&addresses=${segugio1}&addresses=${segugio2}&....
+    let addresses = "addresses=" + segugios[0].target;
+    for (var segugio of segugios) {
+      if (segugio.target === segugios[0].target) {
+        continue;
+      }
+      addresses += "&addresses=" + segugio.target;
+    }
+
+    let result = await axios(
+      `${env.APP_BASE_URL}/1inch/profit-and-loss?${addresses}`,
+      {
+        method: "GET",
+      }
+    );
+
+    if (result.status !== 200) {
+      logger.error(
+        `Error getting profit and loss for ${addresses}: ${result.data}`
+      );
+      res.status(500).json({
+        error: `Error getting profit and loss for ${addresses}: ${result.data}`,
+      });
+      return;
+    }
+
+    const profitAndLoss = result.data.data.profitAndLoss as OneInchPnL;
+    const baseResult = profitAndLoss.result.find(
+      (pnl) => pnl.chain_id === base.id
+    );
+    const pnlUsd = baseResult?.abs_profit_usd.toFixed(2);
+    const roi = baseResult?.roi ? (baseResult?.roi * 100).toFixed(4) : 0;
+
+    result = await axios(
+      `${env.APP_BASE_URL}/1inch/current-value?${addresses}`,
+      {
+        method: "GET",
+      }
+    );
+
+    if (result.status !== 200) {
+      logger.error(
+        `Error getting current value for ${addresses}: ${result.data}`
+      );
+      res.status(500).json({
+        error: `Error getting current value for ${addresses}: ${result.data}`,
+      });
+      return;
+    }
+
+    const currentValue = (result.data.data.currentValue as OneInchGeneralValue).result[0].value_usd.toFixed(2);
+
+    message += `\n\nGeneral stats for your segugios\n\nPnL in USD: \$${pnlUsd}\nROI: ${roi}\%\nCurrent Value: \$${currentValue}`;
+
+    res.status(200).json({
+      status: "ok",
+      data: {
+        message,
+      },
+    });
+  } catch  {
+    logger.error(`Error getting stats`);
+    res.status(500).json({
+      status: "nok",
+      data: {
+        message: `Error getting stats`,
       },
     });
   }
